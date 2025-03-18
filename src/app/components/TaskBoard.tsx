@@ -8,6 +8,7 @@ import type { TaskStatus } from '../types/task';
 import TaskCard from './TaskCard';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import TaskDetailsModal from './TaskDetailsModal';
+import { toast } from 'react-toastify';
 
 const TASK_STATUSES: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE'];
 
@@ -31,8 +32,6 @@ interface ColumnProps {
 
 /**
  * Компонент Column отображает список задач с одинаковым статусом
- * @param {ColumnProps} props - Пропсы компонента
- * @returns {JSX.Element} Отрендеренный компонент
  */
 function Column({ tasks, status, title, onStatusChange, onDelete, onEdit }: ColumnProps) {
   const { setNodeRef } = useSortable({ id: status });
@@ -55,16 +54,15 @@ function Column({ tasks, status, title, onStatusChange, onDelete, onEdit }: Colu
   );
 }
 
+interface TaskBoardProps {
+  initialTasks: Task[];
+}
+
 /**
  * Компонент TaskBoard управляет всей доской задач с функционалом перетаскивания
- * @returns {JSX.Element} Отрендеренный компонент
  */
-export default function TaskBoard() {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', title: 'Создать дизайн', status: 'TODO' },
-    { id: '2', title: 'Написать код', status: 'IN_PROGRESS' },
-    { id: '3', title: 'Тестирование', status: 'DONE' },
-  ]);
+export default function TaskBoard({ initialTasks }: TaskBoardProps) {
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
@@ -76,17 +74,29 @@ export default function TaskBoard() {
    * @param {string} id - ID задачи
    * @param {TaskStatus} newStatus - Новый статус задачи
    */
-  const handleStatusChange = (id: string, newStatus: TaskStatus) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, status: newStatus } : task
-    ));
+  const handleStatusChange = async (id: string, newStatus: TaskStatus) => {
+    const taskToUpdate = tasks.find(task => task.id === id);
+    if (!taskToUpdate) return;
+
+    const updatedTask = { ...taskToUpdate, status: newStatus };
+    const res = await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedTask),
+    });
+
+    if (res.ok) {
+      setTasks(tasks.map(task => (task.id === id ? updatedTask : task)));
+    } else {
+      toast.error('Ошибка при обновлении статуса');
+    }
   };
 
   /**
    * Обрабатывает добавление новой задачи
    * @param {React.FormEvent} e - Событие отправки формы
    */
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     
@@ -95,8 +105,21 @@ export default function TaskBoard() {
       title: newTaskTitle,
       status: 'TODO',
     };
-    setTasks([...tasks, newTask]);
-    setNewTaskTitle('');
+    
+    const res = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTask),
+    });
+
+    if (res.ok) {
+      const addedTask = await res.json();
+      setTasks([...tasks, addedTask]);
+      setNewTaskTitle('');
+      toast.success('Задача добавлена');
+    } else {
+      toast.error('Ошибка при добавлении задачи');
+    }
   };
 
   /**
@@ -111,11 +134,22 @@ export default function TaskBoard() {
   /**
    * Подтверждает удаление задачи
    */
-  const confirmDelete = () => {
-    if (taskToDelete) {
+  const confirmDelete = async () => {
+    if (!taskToDelete) return;
+
+    const res = await fetch('/api/tasks', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: taskToDelete }),
+    });
+
+    if (res.ok) {
       setTasks(tasks.filter(task => task.id !== taskToDelete));
       setTaskToDelete(null);
       setIsDeleteModalOpen(false);
+      toast.success('Задача удалена');
+    } else {
+      toast.error('Ошибка при удалении задачи');
     }
   };
 
@@ -132,17 +166,25 @@ export default function TaskBoard() {
    * Обрабатывает сохранение изменений задачи
    * @param {Task} updatedTask - Обновленные данные задачи
    */
-  const handleSaveTask = (updatedTask: Task) => {
-    setTasks(tasks.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
-    ));
+  const handleSaveTask = async(updatedTask: Task) => {
+    const res = await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedTask),
+    });
+
+    if (res.ok) {
+      setTasks(tasks.map(task => (task.id === updatedTask.id ? updatedTask : task)));
+    } else {
+      toast.error('Ошибка при сохранении задачи');
+    }
   };
 
   /**
    * Обрабатывает события перетаскивания
    * @param {DragEndEvent} event - Событие окончания перетаскивания
    */
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
 
@@ -155,12 +197,22 @@ export default function TaskBoard() {
     if (activeTask && overTask && activeTask.status === overTask.status) {
       const oldIndex = tasks.findIndex(task => task.id === activeId);
       const newIndex = tasks.findIndex(task => task.id === overId);
-      setTasks(arrayMove(tasks, oldIndex, newIndex));
+      const newTasks = arrayMove(tasks, oldIndex, newIndex);
+      setTasks(newTasks);
     } else if (activeTask && TASK_STATUSES.includes(overId as TaskStatus)) {
       const newStatus = overId as TaskStatus;
-      setTasks(tasks.map(task => 
-        task.id === activeId ? { ...task, status: newStatus } : task
-      ));
+      const updatedTask = { ...activeTask, status: newStatus };
+      const res = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTask),
+      });
+
+      if (res.ok) {
+        setTasks(tasks.map(task => (task.id === activeId ? updatedTask : task)));
+      } else {
+        toast.error('Ошибка при перемещении задачи');
+      }
     }
   };
 
@@ -218,4 +270,16 @@ export default function TaskBoard() {
       />
     </div>
   );
+}
+
+export async function getServerSideProps() {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/tasks`, {
+    cache: 'no-store',
+  });
+  const initialTasks: Task[] = await res.json();
+  return {
+    props: {
+      initialTasks,
+    },
+  };
 }

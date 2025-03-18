@@ -13,9 +13,11 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@heroicons/react": "^2.2.0",
+    "@prisma/client": "^6.5.0",
     "autoprefixer": "^10.4.20",
     "dayjs": "^1.11.13",
     "next": "15.2.0",
+    "prisma": "^6.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-toastify": "^11.0.5"
