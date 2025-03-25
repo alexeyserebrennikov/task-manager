@@ -271,15 +271,3 @@ export default function TaskBoard({ initialTasks }: TaskBoardProps) {
     </div>
   );
 }
-
-export async function getServerSideProps() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/tasks`, {
-    cache: 'no-store',
-  });
-  const initialTasks: Task[] = await res.json();
-  return {
-    props: {
-      initialTasks,
-    },
-  };
-}
