@@ -1,4 +1,3 @@
-// /app/api/tasks/route.ts
 import { PrismaClient } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { Task } from '@/app/types/task';
