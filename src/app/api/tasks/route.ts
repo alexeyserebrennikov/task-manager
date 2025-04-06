@@ -22,7 +22,12 @@ export async function POST(req: NextRequest) {
     if (!newTask.title || !newTask.status) {
       return NextResponse.json({ error: 'Заголовок и статус обязательны' }, { status: 400 });
     }
-    const task = await prisma.task.create({ data: newTask });
+    const task = await prisma.task.create({ 
+      data: {
+        ...newTask,
+        id: Date.now().toString()
+      }
+    });
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     console.error('Ошибка при создании задачи:', error);
@@ -46,8 +51,11 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await req.json();
-    await prisma.task.delete({ where: { id } });
+    const body = await req.json();
+    if (!body.id) {
+      return NextResponse.json({ error: 'ID задачи не указан' }, { status: 400 });
+    }
+    await prisma.task.delete({ where: { id: body.id } });
     return NextResponse.json({ message: 'Задача удалена' });
   } catch (error) {
     console.error('Ошибка при удалении задачи:', error);
